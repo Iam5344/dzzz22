@@ -1,73 +1,76 @@
 using Microsoft.EntityFrameworkCore;
+using System.ComponentModel.DataAnnotations;
 
-public class Title
-{
-    public int Id { get; set; }
-    public string Name { get; set; }
-    public int Duration { get; set; }
-}
-
+// Entities
 public class User
 {
     public int Id { get; set; }
-    public string FullName { get; set; }
-    public string Login { get; set; }
-    public string Password { get; set; }
+
+    [Required]
+    [MinLength(1)]
+    public string Username { get; set; } = null!;
+
+    [Required]
+    [EmailAddress]
+    public string Email { get; set; } = null!;
+
+    [Required]
+    public string Password { get; set; } = null!;
+
+    public List<Movie> Movies { get; set; } = new();
 }
 
-public class AppContext : DbContext
+public class Movie
 {
-    public DbSet<Title> Titles { get; set; }
+    public int Id { get; set; }
+
+    [Required]
+    [MaxLength(50)]
+    public string Title { get; set; } = null!;
+
+    [Range(1, int.MaxValue)]
+    public int ReleaseYear { get; set; }
+
+    public string? Description { get; set; }
+
+    public DateTime AddedAt { get; set; } = DateTime.Now;
+
+    public int UserId { get; set; }
+    public User User { get; set; } = null!;
+}
+public class AppDbContext : DbContext
+{
     public DbSet<User> Users { get; set; }
+    public DbSet<Movie> Movies { get; set; }
 
     protected override void OnConfiguring(DbContextOptionsBuilder options)
     {
         options.UseSqlServer("Data Source=DESKTOP-8UTPR8Q\\IAM5344;Initial Catalog=MoviesDb;Integrated Security=True;Encrypt=False;");
     }
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<User>()
+            .HasIndex(u => u.Username)
+            .IsUnique();
+
+        modelBuilder.Entity<User>()
+            .HasIndex(u => u.Email)
+            .IsUnique();
+
+        modelBuilder.Entity<Movie>()
+            .HasOne(m => m.User)
+            .WithMany(u => u.Movies)
+            .HasForeignKey(m => m.UserId);
+    }
 }
+
 
 class Program
 {
-    static void Main()
+    static void Main(string[] args)
     {
-        using var db = new AppContext();
+        using var db = new AppDbContext();
         db.Database.Migrate();
-
-        while (true)
-        {
-            Console.WriteLine("\n ГОЛОВНЕ МЕНЮ");
-            Console.WriteLine("1. Реєстрація користувача");
-            Console.WriteLine("2. Перегляд користувачів");
-            Console.WriteLine("0. Вихід");
-            Console.Write("Вибір: ");
-            string choice = Console.ReadLine();
-
-            if (choice == "1")
-            {
-                Console.WriteLine("\n=== РЕЄСТРАЦІЯ ===");
-                Console.Write("Ім'я: "); string name = Console.ReadLine();
-                Console.Write("Логін: "); string login = Console.ReadLine();
-                Console.Write("Пароль: "); string password = Console.ReadLine();
-
-                db.Users.Add(new User { FullName = name, Login = login, Password = password });
-                db.SaveChanges();
-                Console.WriteLine("Користувача зареєстровано.");
-                Console.WriteLine("Натисніть будь-яку клавішу для повернення...");
-                Console.ReadKey();
-            }
-            else if (choice == "2")
-            {
-                Console.WriteLine("\n КОРИСТУВАЧІ");
-                foreach (var u in db.Users)
-                    Console.WriteLine($"{u.Id} | {u.FullName} | {u.Login}");
-
-                Console.WriteLine("Натисніть будь-яку клавішу для повернення...");
-                Console.ReadKey();
-            }
-            else if (choice == "0")
-            {
-                return;
-            }
-        }
     }
 }
