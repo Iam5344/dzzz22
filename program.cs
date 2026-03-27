@@ -1,203 +1,160 @@
-using Microsoft.Data.SqlClient;
-using Dapper;
-using System.Windows.Forms;
+using Microsoft.EntityFrameworkCore;
 
-public class Dog
+public class Game
 {
     public int Id { get; set; }
-    public string Name { get; set; }
-    public int Age { get; set; }
-    public string Breed { get; set; }
-    public bool IsAdopted { get; set; }
-    public int? AdopterId { get; set; }
-    public Adopter Adopter { get; set; }
+    public string Title { get; set; } = null!;
+    public string Genre { get; set; } = null!;
+    public int MinPlayers { get; set; }
+    public int MaxPlayers { get; set; }
+    public List<Session> Sessions { get; set; } = new();
 }
 
-public class Adopter
+public class Member
 {
     public int Id { get; set; }
-    public string FullName { get; set; }
-    public string Phone { get; set; }
-    public List<Dog> Dogs { get; set; } = new();
+    public string FullName { get; set; } = null!;
+    public DateTime JoinDate { get; set; }
+    public List<MemberSession> MemberSessions { get; set; } = new();
 }
 
-public class Form1 : Form
+public class Session
 {
-    static string cs = "Data Source=DESKTOP-8UTPR8Q\\IAM5344;Initial Catalog=ShelterDb;Integrated Security=True;Encrypt=False;";
+    public int Id { get; set; }
+    public int GameId { get; set; }
+    public Game Game { get; set; } = null!;
+    public DateTime Date { get; set; }
+    public int DurationMinutes { get; set; }
+    public List<MemberSession> MemberSessions { get; set; } = new();
+}
 
-    TabControl tabs = new TabControl() { Left = 5, Top = 5, Width = 760, Height = 520 };
+public class MemberSession
+{
+    public int Id { get; set; }
+    public int MemberId { get; set; }
+    public Member Member { get; set; } = null!;
+    public int SessionId { get; set; }
+    public Session Session { get; set; } = null!;
+}
 
-    public Form1()
+public class AppDbContext : DbContext
+{
+    public DbSet<Game> Games { get; set; }
+    public DbSet<Member> Members { get; set; }
+    public DbSet<Session> Sessions { get; set; }
+    public DbSet<MemberSession> MembersSessions { get; set; }
+
+    protected override void OnConfiguring(DbContextOptionsBuilder options)
     {
-        this.Text = "Притулок для собак";
-        this.Width = 790;
-        this.Height = 570;
-
-        tabs.TabPages.Add(DogsTab());
-        tabs.TabPages.Add(AdoptersTab());
-        tabs.TabPages.Add(AdoptTab());
-
-        this.Controls.Add(tabs);
+        options.UseSqlServer("Data Source=DESKTOP-8UTPR8Q\\IAM5344;Initial Catalog=BoardGamesDb;Integrated Security=True;Encrypt=False;");
     }
 
-    TabPage DogsTab()
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        TabPage tab = new TabPage("Собаки");
+        modelBuilder.Entity<Game>()
+            .Property(g => g.Title)
+            .HasMaxLength(100)
+            .IsRequired();
 
-        TextBox txtName = new TextBox() { Left = 80, Top = 10, Width = 120 };
-        TextBox txtAge = new TextBox() { Left = 80, Top = 40, Width = 120 };
-        TextBox txtBreed = new TextBox() { Left = 80, Top = 70, Width = 120 };
-        DataGridView grid = new DataGridView() { Left = 5, Top = 150, Width = 720, Height = 300, ReadOnly = true };
+        modelBuilder.Entity<Game>()
+            .ToTable(t => t.HasCheckConstraint("CK_MinPlayers", "MinPlayers > 0"));
 
-        tab.Controls.Add(new Label() { Text = "Кличка:", Left = 5, Top = 10, Width = 70 });
-        tab.Controls.Add(txtName);
-        tab.Controls.Add(new Label() { Text = "Вік:", Left = 5, Top = 40, Width = 70 });
-        tab.Controls.Add(txtAge);
-        tab.Controls.Add(new Label() { Text = "Порода:", Left = 5, Top = 70, Width = 70 });
-        tab.Controls.Add(txtBreed);
+        modelBuilder.Entity<Game>()
+            .ToTable(t => t.HasCheckConstraint("CK_MaxPlayers", "MaxPlayers > 0"));
 
-        Button btnAdd = new Button() { Text = "Додати", Left = 210, Top = 10, Width = 80 };
-        btnAdd.Click += (s, e) =>
-        {
-            using var con = new SqlConnection(cs);
-            con.Execute("INSERT INTO Dogs (Name, Age, Breed, IsAdopted) VALUES (@Name, @Age, @Breed, 0)",
-                new { Name = txtName.Text, Age = int.Parse(txtAge.Text), Breed = txtBreed.Text });
-            MessageBox.Show("Додано.");
-        };
-        tab.Controls.Add(btnAdd);
+        modelBuilder.Entity<Game>()
+            .ToTable(t => t.HasCheckConstraint("CK_MinMax", "MinPlayers <= MaxPlayers"));
 
-        Button btnAll = new Button() { Text = "Всі", Left = 5, Top = 110, Width = 80 };
-        btnAll.Click += (s, e) => LoadDogs(grid, "SELECT * FROM Dogs");
-        tab.Controls.Add(btnAll);
+        modelBuilder.Entity<Member>()
+            .Property(m => m.JoinDate)
+            .HasColumnType("datetime");
 
-        Button btnShelter = new Button() { Text = "В притулку", Left = 90, Top = 110, Width = 90 };
-        btnShelter.Click += (s, e) => LoadDogs(grid, "SELECT * FROM Dogs WHERE IsAdopted = 0");
-        tab.Controls.Add(btnShelter);
+        modelBuilder.Entity<Session>()
+            .Property(s => s.Date)
+            .HasColumnType("datetime");
 
-        Button btnAdopted = new Button() { Text = "Забрані", Left = 190, Top = 110, Width = 80 };
-        btnAdopted.Click += (s, e) => LoadDogs(grid, "SELECT * FROM Dogs WHERE IsAdopted = 1");
-        tab.Controls.Add(btnAdopted);
+        modelBuilder.Entity<Game>()
+            .HasMany(g => g.Sessions)
+            .WithOne(s => s.Game)
+            .HasForeignKey(s => s.GameId);
 
-        tab.Controls.Add(grid);
-        return tab;
+        modelBuilder.Entity<MemberSession>()
+            .HasOne(ms => ms.Member)
+            .WithMany(m => m.MemberSessions)
+            .HasForeignKey(ms => ms.MemberId);
+
+        modelBuilder.Entity<MemberSession>()
+            .HasOne(ms => ms.Session)
+            .WithMany(s => s.MemberSessions)
+            .HasForeignKey(ms => ms.SessionId);
     }
+}
 
-    void LoadDogs(DataGridView grid, string sql)
-    {
-        using var con = new SqlConnection(cs);
-        var dogs = con.Query<Dog, Adopter, Dog>(
-            sql + " LEFT JOIN Adopters A ON Dogs.AdopterId = A.Id",
-            (dog, adopter) => { dog.Adopter = adopter; return dog; },
-            splitOn: "Id");
-
-        grid.Rows.Clear();
-        grid.Columns.Clear();
-        grid.Columns.Add("Id", "Id");
-        grid.Columns.Add("Name", "Кличка");
-        grid.Columns.Add("Age", "Вік");
-        grid.Columns.Add("Breed", "Порода");
-        grid.Columns.Add("Status", "Статус");
-        grid.Columns.Add("Adopter", "Опікун");
-
-        foreach (var d in dogs)
-            grid.Rows.Add(d.Id, d.Name, d.Age, d.Breed,
-                d.IsAdopted ? "Забрали" : "В притулку",
-                d.Adopter?.FullName ?? "-");
-    }
-
-
-    TabPage AdoptersTab()
-    {
-        TabPage tab = new TabPage("Опікуни");
-
-        TextBox txtName = new TextBox() { Left = 80, Top = 10, Width = 150 };
-        TextBox txtPhone = new TextBox() { Left = 80, Top = 40, Width = 150 };
-        DataGridView grid = new DataGridView() { Left = 5, Top = 100, Width = 720, Height = 350, ReadOnly = true };
-
-        tab.Controls.Add(new Label() { Text = "Ім'я:", Left = 5, Top = 10, Width = 70 });
-        tab.Controls.Add(txtName);
-        tab.Controls.Add(new Label() { Text = "Телефон:", Left = 5, Top = 40, Width = 70 });
-        tab.Controls.Add(txtPhone);
-
-        Button btnAdd = new Button() { Text = "Додати", Left = 240, Top = 10, Width = 80 };
-        btnAdd.Click += (s, e) =>
-        {
-            using var con = new SqlConnection(cs);
-            con.Execute("INSERT INTO Adopters (FullName, Phone) VALUES (@FullName, @Phone)",
-                new { FullName = txtName.Text, Phone = txtPhone.Text });
-            MessageBox.Show("Додано.");
-        };
-        tab.Controls.Add(btnAdd);
-
-        Button btnShow = new Button() { Text = "Показати всіх", Left = 5, Top = 65, Width = 120 };
-        btnShow.Click += (s, e) =>
-        {
-            using var con = new SqlConnection(cs);
-            var adopters = con.Query("SELECT * FROM Adopters");
-            grid.Rows.Clear();
-            grid.Columns.Clear();
-            grid.Columns.Add("Id", "Id");
-            grid.Columns.Add("FullName", "Ім'я");
-            grid.Columns.Add("Phone", "Телефон");
-            foreach (var a in adopters)
-                grid.Rows.Add(a.Id, a.FullName, a.Phone);
-        };
-        tab.Controls.Add(btnShow);
-
-        tab.Controls.Add(grid);
-        return tab;
-    }
-
-    TabPage AdoptTab()
-    {
-        TabPage tab = new TabPage("Адопція");
-
-        TextBox txtDogId = new TextBox() { Left = 100, Top = 10, Width = 100 };
-        TextBox txtAdopterId = new TextBox() { Left = 100, Top = 40, Width = 100 };
-
-        tab.Controls.Add(new Label() { Text = "Id собаки:", Left = 5, Top = 10, Width = 90 });
-        tab.Controls.Add(txtDogId);
-        tab.Controls.Add(new Label() { Text = "Id опікуна:", Left = 5, Top = 40, Width = 90 });
-        tab.Controls.Add(txtAdopterId);
-
-        Button btnAdopt = new Button() { Text = "Адоптувати", Left = 5, Top = 75, Width = 110 };
-        btnAdopt.Click += (s, e) =>
-        {
-            using var con = new SqlConnection(cs);
-            con.Execute("UPDATE Dogs SET IsAdopted = 1, AdopterId = @AdopterId WHERE Id = @DogId",
-                new { AdopterId = int.Parse(txtAdopterId.Text), DogId = int.Parse(txtDogId.Text) });
-            MessageBox.Show("Адоптовано.");
-        };
-        tab.Controls.Add(btnAdopt);
-
-        return tab;
-    }
-
-    [STAThread]
+class Program
+{
     static void Main()
     {
-        using var con = new SqlConnection(cs);
-        con.Open();
+        using var db = new AppDbContext();
+        db.Database.Migrate();
 
-        con.Execute(@"
-            IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='Adopters' AND xtype='U')
-            CREATE TABLE Adopters (
-                Id INT PRIMARY KEY IDENTITY(1,1),
-                FullName NVARCHAR(100) NOT NULL,
-                Phone NVARCHAR(20) NOT NULL
-            )");
+        if (!db.Members.Any())
+        {
+            var members = new List<Member>
+            {
+                new Member { FullName = "Олексій Коваль", JoinDate = new DateTime(2023, 1, 10) },
+                new Member { FullName = "Марія Бондар", JoinDate = new DateTime(2023, 2, 15) },
+                new Member { FullName = "Іван Шевченко", JoinDate = new DateTime(2023, 3, 20) },
+                new Member { FullName = "Анна Мельник", JoinDate = new DateTime(2023, 4, 5) },
+                new Member { FullName = "Петро Лисенко", JoinDate = new DateTime(2023, 5, 12) }
+            };
 
-        con.Execute(@"
-            IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='Dogs' AND xtype='U')
-            CREATE TABLE Dogs (
-                Id INT PRIMARY KEY IDENTITY(1,1),
-                Name NVARCHAR(100) NOT NULL,
-                Age INT NOT NULL,
-                Breed NVARCHAR(100) NOT NULL,
-                IsAdopted BIT NOT NULL DEFAULT 0,
-                AdopterId INT NULL REFERENCES Adopters(Id)
-            )");
+            var games = new List<Game>
+            {
+                new Game { Title = "Catan", Genre = "Strategy", MinPlayers = 2, MaxPlayers = 4 },
+                new Game { Title = "Dixit", Genre = "Creative", MinPlayers = 3, MaxPlayers = 6 },
+                new Game { Title = "Pandemic", Genre = "Cooperative", MinPlayers = 2, MaxPlayers = 4 },
+                new Game { Title = "Ticket to Ride", Genre = "Strategy", MinPlayers = 2, MaxPlayers = 5 },
+                new Game { Title = "Codenames", Genre = "Party", MinPlayers = 4, MaxPlayers = 8 }
+            };
 
-        Application.Run(new Form1());
+            db.Members.AddRange(members);
+            db.Games.AddRange(games);
+            db.SaveChanges();
+
+            var rnd = new Random();
+            var sessions = new List<Session>();
+            for (int i = 0; i < 10; i++)
+            {
+                sessions.Add(new Session
+                {
+                    GameId = games[rnd.Next(games.Count)].Id,
+                    Date = DateTime.Now.AddDays(-rnd.Next(1, 100)),
+                    DurationMinutes = rnd.Next(30, 180)
+                });
+            }
+
+            db.Sessions.AddRange(sessions);
+            db.SaveChanges();
+
+            foreach (var session in sessions)
+            {
+                var shuffled = members.OrderBy(_ => rnd.Next()).Take(rnd.Next(2, 5)).ToList();
+                foreach (var member in shuffled)
+                {
+                    db.MembersSessions.Add(new MemberSession
+                    {
+                        MemberId = member.Id,
+                        SessionId = session.Id
+                    });
+                }
+            }
+
+            db.SaveChanges();
+            Console.WriteLine("БД заповнено.");
+        }
+        else
+        {
+            Console.WriteLine("БД вже заповнена.");
+        }
     }
 }
