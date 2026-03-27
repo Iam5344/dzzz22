@@ -158,3 +158,4 @@ class Program
         }
     }
 }
+Update-Database
