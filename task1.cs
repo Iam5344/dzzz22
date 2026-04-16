@@ -7,7 +7,6 @@ class Program
     [STAThread]
     static void Main(string[] args)
     {
-        // Завдання 3 - Дочірній процес
         if (args.Length == 3)
         {
             double a = double.Parse(args[0]);
