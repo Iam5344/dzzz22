@@ -1,5 +1,6 @@
 using System;
 using System.Threading;
+using System.Threading.Tasks;
 
 int[] numbers = new int[1000];
 int max = 0, min = 0;
@@ -7,9 +8,9 @@ double avg = 0;
 
 ManualResetEvent mre = new ManualResetEvent(false);
 
-Thread generator = new Thread(() =>
+Task generator = Task.Run(() =>
 {
-    Console.WriteLine("Генерація чисел...");
+    Console.WriteLine("Генерація чисел");
     Random rnd = new Random();
     for (int i = 0; i < 1000; i++)
         numbers[i] = rnd.Next(0, 5000);
@@ -17,7 +18,7 @@ Thread generator = new Thread(() =>
     mre.Set();
 });
 
-Thread t1 = new Thread(() =>
+Task t1 = Task.Run(() =>
 {
     Console.WriteLine("Потік 1 очікує...");
     mre.WaitOne();
@@ -28,7 +29,7 @@ Thread t1 = new Thread(() =>
     Console.WriteLine("Максимум: " + max);
 });
 
-Thread t2 = new Thread(() =>
+Task t2 = Task.Run(() =>
 {
     Console.WriteLine("Потік 2 очікує");
     mre.WaitOne();
@@ -39,7 +40,7 @@ Thread t2 = new Thread(() =>
     Console.WriteLine("Мінімум: " + min);
 });
 
-Thread t3 = new Thread(() =>
+Task t3 = Task.Run(() =>
 {
     Console.WriteLine("Потік 3 очікує");
     mre.WaitOne();
@@ -51,13 +52,4 @@ Thread t3 = new Thread(() =>
     Console.WriteLine("Середнє: " + avg);
 });
 
-t1.Start();
-t2.Start();
-t3.Start();
-generator.Start();
-
-generator.Join();
-t1.Join();
-t2.Join();
-t3.Join();
-
+Task.WaitAll(generator, t1, t2, t3);
