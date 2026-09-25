@@ -1,61 +1,127 @@
 <!DOCTYPE html>
 <html lang="uk">
-
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title></title>
 </head>
 <body>
 
-
   <script>
 
-    function multiplyAsync(a, b) {
-      return new Promise((resolve, reject) => {
+
+    function calculate(a, b, onSuccess, onError) {
+      if (b === 0) {
+        onError("Ділення на нуль заборонено");
+      } else {
+        onSuccess(a / b);
+      }
+    }
+
+    function onSuccess(result) {
+      console.log(`Результат: ${result}`);
+    }
+
+    function onError(error) {
+      console.log(`Помилка: ${error}`);
+    }
+
+    console.log("--- Завдання 1 ---");
+    calculate(10, 2, onSuccess, onError);
+    calculate(10, 0, onSuccess, onError); 
+
+
+    function processArray(array, callback) {
+      const result = [];
+      for (let i = 0; i < array.length; i++) {
+        const res = callback(array[i]);
+        if (res !== undefined) {
+          result.push(res);
+        }
+      }
+      return result.length > 0 ? result : undefined;
+    }
+
+    function logElement(element) {
+      console.log(element);
+    }
+
+    function squareElement(element) {
+      return element * element;
+    }
+
+    console.log("\n--- Завдання 2 ---");
+    processArray([1, 2, 3, 4, 5], logElement);
+    console.log("Результат:", processArray([1, 2, 3, 4, 5], squareElement));
+
+
+
+    function createOrder(orderId) {
+      return new Promise((resolve) => {
         setTimeout(() => {
-          if (typeof a !== 'number' || typeof b !== 'number' || Number.isNaN(a) || Number.isNaN(b)) {
-            reject("Некоректні значення");
-          } else {
-            resolve(a * b);
-          }
+          resolve(`Замовлення створено: ${orderId}`);
+        }, 1000);
+      });
+    }
+
+    function processOrder(orderId) {
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          resolve(`Замовлення оброблено: ${orderId}`);
         }, 2000);
       });
     }
 
-
-    function sortArrayAsync(array) {
-      return new Promise((resolve, reject) => {
+    function deliverOrder(orderId) {
+      return new Promise((resolve) => {
         setTimeout(() => {
-          if (!Array.isArray(array) || array.length === 0) {
-            reject("Масив порожній");
-          } else {
-            const sortedArray = [...array].sort((a, b) => a - b);
-            resolve(sortedArray);
-          }
-        }, 2000);
+          resolve(`Замовлення доставлено: ${orderId}`);
+        }, 3000);
       });
     }
 
-    async function main() {
+    console.log("\n--- Завдання 3 ---");
+    const myOrderId = 101;
 
-      try {
-        const multResult = await multiplyAsync(6, 9);
-        console.log("Результат множення:", multResult);
-      } catch (error) {
-        console.log("Помилка множення:", error);
-      }
+    createOrder(myOrderId)
+      .then((msg) => {
+        console.log(msg);
+        return processOrder(myOrderId);
+      })
+      .then((msg) => {
+        console.log(msg);
+        return deliverOrder(myOrderId);
+      })
+      .then((msg) => {
+        console.log(msg);
+      });
 
 
-      try {
-        const sortedResult = await sortArrayAsync([42, 7, 19, 3, 88, 1]);
-        console.log("Відсортований масив:", sortedResult);
-      } catch (error) {
-        console.log("Помилка сортування:", error);
-      }
+
+    function checkEvenNumber(number) {
+      return new Promise((resolve, reject) => {
+        setTimeout(() => {
+          if (number % 2 === 0) {
+            resolve(`Парне число: ${number}`);
+          } else {
+            reject(`Непарне число: ${number}`);
+          }
+        }, 1000);
+      });
     }
 
-    main();
+
+    setTimeout(() => {
+      console.log("\n--- Завдання 4 ---");
+
+      checkEvenNumber(4)
+        .then((result) => console.log(result))
+        .catch((error) => console.log(error));
+
+      checkEvenNumber(7)
+        .then((result) => console.log(result))
+        .catch((error) => console.log(error));
+    }, 6500);
   </script>
 </body>
 </html>
